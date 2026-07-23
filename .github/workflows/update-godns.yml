@@ -1,0 +1,136 @@
+name: Update GoDNS Formula
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-godns
+  cancel-in-progress: true
+
+jobs:
+  update-godns:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get latest GoDNS release
+        id: latest_release
+        run: |
+          RELEASE_INFO=$(curl -sf -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/TimothyYe/godns/releases/latest")
+
+          if ! echo "$RELEASE_INFO" | jq -e '.tag_name' > /dev/null 2>&1; then
+            echo "Error: Failed to fetch release info from GitHub API"
+            exit 1
+          fi
+
+          LATEST_VERSION=$(echo "$RELEASE_INFO" | jq -r '.tag_name' | sed 's/^v//')
+          CURRENT_VERSION=$(grep 'version "' Formula/godns.rb | head -1 | awk '{print $2}' | tr -d '"')
+
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+          get_asset_info() {
+            local platform="$1"
+            local field="$2"
+            local value
+            if [ "$field" = "url" ]; then
+              value=$(echo "$RELEASE_INFO" | jq -r ".assets[] | select(.name | contains(\"$platform\")) | .browser_download_url")
+            else
+              value=$(echo "$RELEASE_INFO" | jq -r ".assets[] | select(.name | contains(\"$platform\")) | .digest" | cut -d: -f2)
+            fi
+            if [ -z "$value" ] || [ "$value" = "null" ]; then
+              echo "Error: Failed to get $field for $platform" >&2
+              return 1
+            fi
+            echo "$value"
+          }
+
+          DARWIN_ARM64_URL=$(get_asset_info "darwin_arm64" "url") || exit 1
+          DARWIN_ARM64_SHA=$(get_asset_info "darwin_arm64" "sha") || exit 1
+          DARWIN_AMD64_URL=$(get_asset_info "darwin_amd64" "url") || exit 1
+          DARWIN_AMD64_SHA=$(get_asset_info "darwin_amd64" "sha") || exit 1
+          LINUX_ARM64_URL=$(get_asset_info "linux_arm64" "url") || exit 1
+          LINUX_ARM64_SHA=$(get_asset_info "linux_arm64" "sha") || exit 1
+          LINUX_AMD64_URL=$(get_asset_info "linux_amd64" "url") || exit 1
+          LINUX_AMD64_SHA=$(get_asset_info "linux_amd64" "sha") || exit 1
+
+          echo "darwin_arm64_url=$DARWIN_ARM64_URL" >> $GITHUB_OUTPUT
+          echo "darwin_arm64_sha=$DARWIN_ARM64_SHA" >> $GITHUB_OUTPUT
+          echo "darwin_amd64_url=$DARWIN_AMD64_URL" >> $GITHUB_OUTPUT
+          echo "darwin_amd64_sha=$DARWIN_AMD64_SHA" >> $GITHUB_OUTPUT
+          echo "linux_arm64_url=$LINUX_ARM64_URL" >> $GITHUB_OUTPUT
+          echo "linux_arm64_sha=$LINUX_ARM64_SHA" >> $GITHUB_OUTPUT
+          echo "linux_amd64_url=$LINUX_AMD64_URL" >> $GITHUB_OUTPUT
+          echo "linux_amd64_sha=$LINUX_AMD64_SHA" >> $GITHUB_OUTPUT
+
+          # Check if update is needed: new version OR existing SHA/URL values are incomplete
+          NEEDS_UPDATE=false
+          if [ "$LATEST_VERSION" != "$CURRENT_VERSION" ]; then
+            echo "New version available: v$LATEST_VERSION (current: v$CURRENT_VERSION)"
+            NEEDS_UPDATE=true
+          else
+            echo "Version is up to date (v$CURRENT_VERSION), checking formula completeness..."
+            if grep -q 'sha256 ""' Formula/godns.rb || grep -q 'url ""' Formula/godns.rb; then
+              echo "Found empty values, triggering update to fix them"
+              NEEDS_UPDATE=true
+            else
+              echo "Already up to date (v$CURRENT_VERSION)"
+            fi
+          fi
+          echo "needs_update=$NEEDS_UPDATE" >> $GITHUB_OUTPUT
+
+      - name: Update formula
+        if: steps.latest_release.outputs.needs_update == 'true'
+        run: |
+          FORMULA="Formula/godns.rb"
+
+          # Update version
+          sed -i "s|version \".*\"|version \"$VERSION\"|" "$FORMULA"
+
+          # Update url + sha256 for each platform
+          update_platform() {
+            local keyword="$1" url="$2" sha="$3"
+            sed -i "s|url \".*${keyword}.*\"|url \"${url}\"|" "$FORMULA"
+            sed -i "/${keyword}/{n;s|sha256 \".*\"|sha256 \"${sha}\"|}" "$FORMULA"
+          }
+
+          update_platform "darwin_arm64" "$DARWIN_ARM64_URL" "$DARWIN_ARM64_SHA"
+          update_platform "darwin_amd64" "$DARWIN_AMD64_URL" "$DARWIN_AMD64_SHA"
+          update_platform "linux_arm64" "$LINUX_ARM64_URL" "$LINUX_ARM64_SHA"
+          update_platform "linux_amd64" "$LINUX_AMD64_URL" "$LINUX_AMD64_SHA"
+        env:
+          VERSION: ${{ steps.latest_release.outputs.latest_version }}
+          DARWIN_ARM64_URL: ${{ steps.latest_release.outputs.darwin_arm64_url }}
+          DARWIN_ARM64_SHA: ${{ steps.latest_release.outputs.darwin_arm64_sha }}
+          DARWIN_AMD64_URL: ${{ steps.latest_release.outputs.darwin_amd64_url }}
+          DARWIN_AMD64_SHA: ${{ steps.latest_release.outputs.darwin_amd64_sha }}
+          LINUX_ARM64_URL: ${{ steps.latest_release.outputs.linux_arm64_url }}
+          LINUX_ARM64_SHA: ${{ steps.latest_release.outputs.linux_arm64_sha }}
+          LINUX_AMD64_URL: ${{ steps.latest_release.outputs.linux_amd64_url }}
+          LINUX_AMD64_SHA: ${{ steps.latest_release.outputs.linux_amd64_sha }}
+
+      - name: Create Pull Request
+        if: steps.latest_release.outputs.needs_update == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore: update godns to v${{ steps.latest_release.outputs.latest_version }}"
+          title: "chore: update godns to v${{ steps.latest_release.outputs.latest_version }}"
+          body: |
+            Auto-update godns formula to latest release.
+
+            - **New version**: v${{ steps.latest_release.outputs.latest_version }}
+            - **Previous version**: v${{ steps.latest_release.outputs.current_version }}
+            - **Release URL**: https://github.com/TimothyYe/godns/releases/tag/v${{ steps.latest_release.outputs.latest_version }}
+          branch: "update-godns-${{ steps.latest_release.outputs.latest_version }}"
+          delete-branch: true
+          labels: |
+            automated pr
+            dependencies
