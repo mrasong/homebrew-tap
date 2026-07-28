@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
   group: update-godns
@@ -117,20 +116,11 @@ jobs:
           LINUX_AMD64_URL: ${{ steps.latest_release.outputs.linux_amd64_url }}
           LINUX_AMD64_SHA: ${{ steps.latest_release.outputs.linux_amd64_sha }}
 
-      - name: Create Pull Request
+      - name: Commit and push changes
         if: steps.latest_release.outputs.needs_update == 'true'
-        uses: peter-evans/create-pull-request@v8
-        with:
-          commit-message: "chore: update godns to v${{ steps.latest_release.outputs.latest_version }}"
-          title: "chore: update godns to v${{ steps.latest_release.outputs.latest_version }}"
-          body: |
-            Auto-update godns formula to latest release.
-
-            - **New version**: v${{ steps.latest_release.outputs.latest_version }}
-            - **Previous version**: v${{ steps.latest_release.outputs.current_version }}
-            - **Release URL**: https://github.com/TimothyYe/godns/releases/tag/v${{ steps.latest_release.outputs.latest_version }}
-          branch: "update-godns-${{ steps.latest_release.outputs.latest_version }}"
-          delete-branch: true
-          labels: |
-            automated pr
-            dependencies
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/godns.rb
+          git commit -m "chore: update godns to v${{ steps.latest_release.outputs.latest_version }}"
+          git push
