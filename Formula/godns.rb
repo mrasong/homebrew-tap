@@ -2,29 +2,29 @@ class Godns < Formula
   desc "GoDNS is a self-hosted dynamic DNS (DDNS) client with multi-provider support and a built-in web panel."
   homepage "https://github.com/TimothyYe/godns"
   license "Apache-2.0"
-  version "3.4.3"
+  version "3.4.4"
 
   on_macos do
     on_arm do
-      url "https://github.com/TimothyYe/godns/releases/download/v3.4.3/godns_3.4.3_darwin_arm64.tar.gz"
-      sha256 "f1ec6330a887df15470462cb5feb8c8080eeac973c9bef9759ca4f071b442ef3"
+      url "https://github.com/TimothyYe/godns/releases/download/v3.4.4/godns_3.4.4_darwin_arm64.tar.gz"
+      sha256 "fd768e551828b9b17283a6c845603ea8fc7c94356da7248c9209d62fd12fbb44"
     end
 
     on_intel do
-      url "https://github.com/TimothyYe/godns/releases/download/v3.4.3/godns_3.4.3_darwin_amd64.tar.gz"
-      sha256 "1b13e5d4ef7fa48b5b5bb09a5b3a1879d2467e3b4df9bc29a6aa52c773e65cf1"
+      url "https://github.com/TimothyYe/godns/releases/download/v3.4.4/godns_3.4.4_darwin_amd64.tar.gz"
+      sha256 "ca2dfdf3b321324641eb2c91af18c1b0582c4ba8a52041f9a1416dc3635ab355"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/TimothyYe/godns/releases/download/v3.4.3/godns_3.4.3_linux_arm64.tar.gz"
-      sha256 "7b8c0f5b9ff60b4a1904e84056677196bf39c0525f9f8c40adaf9756c1a3c244"
+      url "https://github.com/TimothyYe/godns/releases/download/v3.4.4/godns_3.4.4_linux_arm64.tar.gz"
+      sha256 "4e7b777b80fbf5541813304903b0b00261d7900a0a4996ab592ce07e112a6d15"
     end
 
     on_intel do
-      url "https://github.com/TimothyYe/godns/releases/download/v3.4.3/godns_3.4.3_linux_amd64.tar.gz"
-      sha256 "a36a077a02927db4a5ae4e8ff821c8f566122cbd318d07ef592d8b21b3f827e2"
+      url "https://github.com/TimothyYe/godns/releases/download/v3.4.4/godns_3.4.4_linux_amd64.tar.gz"
+      sha256 "c465d60e4f2701bf6dbe378d6f4d66b72d82ed30a42ad6878992208d1a26183a"
     end
   end
 
